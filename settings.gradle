@@ -1,1 +1,2 @@
-include ':checkexceptlint'
+include ':lint-rules'
+include ':lint-rules-android'
