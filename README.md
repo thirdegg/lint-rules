@@ -23,6 +23,6 @@ dependencies {
 ```
 
 ## Checked Exceptions for kotlin
-How it work:
+How it works:
 
 ![](checked-exceptions.png)
