@@ -1,8 +1,20 @@
 ![GitHub](https://img.shields.io/github/license/thirdegg/lint-rules.svg)
-
+[![JitPack](https://jitpack.io/v/thirdegg/lint-rules.svg)](https://jitpack.io/#thirdegg/lint-rules)
 # Android lint rules
 
-Add to your ```build.gradle```:
+Add to your project ```build.gradle```:
+
+```gradle
+allprojects {
+    repositories {
+        ...
+        maven { url 'https://jitpack.io' }
+    }
+}
+```
+
+and to module ```build.gradle```:
+
 ```gradle
 dependencies {
     ...
