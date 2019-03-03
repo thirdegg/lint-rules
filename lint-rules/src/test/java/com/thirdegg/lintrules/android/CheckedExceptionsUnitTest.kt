@@ -13,7 +13,7 @@ class CheckedExceptionsUnitTest {
 
         val testFileKotlin = kotlin("""
 
-            package com.i90g.checkexceptlint
+            package com.thirdegg.lintrules.android
 
             class TestClassKotlin {
 
@@ -41,7 +41,7 @@ class CheckedExceptionsUnitTest {
 
         val testFileJava = java("""
 
-            package com.i90g.checkexceptlint;
+            package com.thirdegg.lintrules.android;
 
             public class TestClassJava {
 

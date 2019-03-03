@@ -22,6 +22,6 @@ dependencies {
 
 jar {
     manifest {
-        attributes("Lint-Registry-v2": "com.i90g.checkexceptlint.CheckedExceptionsRegistry")
+        attributes("Lint-Registry-v2": "com.thirdegg.lintrules.android.LintRulesRegistry")
     }
 }
