@@ -1,1 +1,1 @@
-include ':lint-rules'
+include ':lint-rules-android'
