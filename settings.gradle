@@ -1,2 +1,2 @@
 include ':lint-rules'
-include ':lint-rules-android'
+//include ':lint-rules-android'
