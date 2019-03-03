@@ -69,6 +69,7 @@ class CheckedExceptionsUnitTest {
 
         """).indented()
 
+        //  TestUtils.getSdk() not working
         val sdkPath = if (System.getProperty("os.name").startsWith("Windows")) {
             File(System.getenv("LOCALAPPDATA")+"\\Android\\Sdk")
         } else {

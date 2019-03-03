@@ -72,7 +72,8 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
                                 val clazz = node.resolve()
                                 val clazzName = clazz?.containingClass?.qualifiedName
                                 if (clazzName==null || haveTryCatch.contains(clazzName)) return super.visitCallExpression(node)
-                                context.report(ISSUE_PATTERN, parrentNode, context.getNameLocation(parrentNode), clazzName+" "+haveTryCatch)
+                                context.report(ISSUE_PATTERN, parrentNode, context.getNameLocation(parrentNode),
+                                        "Exception not checked: $clazzName")
                             }
                             return super.visitCallExpression(node)
                         }
