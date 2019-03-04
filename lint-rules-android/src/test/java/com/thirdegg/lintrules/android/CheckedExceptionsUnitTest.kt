@@ -1,88 +1,59 @@
 package com.thirdegg.lintrules.android
 
-import com.android.tools.lint.checks.infrastructure.TestFiles.java
-import com.android.tools.lint.checks.infrastructure.TestFiles.kotlin
 import org.junit.Test
 
 import com.android.tools.lint.checks.infrastructure.TestLintTask.lint
+import com.thirdegg.lintrules.android.CheckedExceptionsClasses.TestClassKotlin
+
+import com.thirdegg.lintrules.android.CheckedExceptionsCoroutinesClasses.KotlinCallClass
+import com.thirdegg.lintrules.android.CheckedExceptionsCoroutinesClasses.KotlinCallbackInterface
+import com.thirdegg.lintrules.android.CheckedExceptionsCoroutinesClasses.KotlinCheckClass
+import com.thirdegg.lintrules.android.CheckedExceptionsCoroutinesClasses.KotlinCoroutineMock
+import com.thirdegg.lintrules.android.CheckedExceptionsCoroutinesClasses.KotlinErrorsClass
+import com.thirdegg.lintrules.android.CheckedExceptionsCoroutinesClasses.KotlinResponseClass
+
 import java.io.File
+import java.net.URI
 
 class CheckedExceptionsUnitTest {
-    @Test
-    fun check_kotlin() {
 
-        val testFileKotlin = kotlin("""
-
-            package com.thirdegg.lintrules.android
-
-            class TestClassKotlin {
-
-                fun test() {
-                    if (false) {
-                        throw TextExceptionKotlin()
-                    } else {
-                        throw Exception()
-                    }
-                }
-
-                fun tryCatch() {
-                    try {
-                        test()
-                    } catch (e:TextExceptionKotlin) {
-                        e.printStackTrace()
-                    }
-                }
-
-            }
-
-            class TextExceptionKotlin:Exception("TextException")
-
-        """).indented()
-
-        val testFileJava = java("""
-
-            package com.thirdegg.lintrules.android;
-
-            public class TestClassJava {
-
-                private void test() throws TextExceptionJava {
-                    if (true) {
-                        throw new TextExceptionJava();
-                    }
-                }
-
-                public void tryCatch() {
-                    try {
-                        test();
-                    } catch (TextExceptionJava e) {
-                        e.printStackTrace();
-                    }
-                }
-
-            }
-
-            class TextExceptionJava extends Exception {
-                TextExceptionJava() {
-                    super("TextException");
-                }
-            }
-
-        """).indented()
-
+    fun getSdk():File {
         //  TestUtils.getSdk() not working
-        val sdkPath = if (System.getProperty("os.name").startsWith("Windows")) {
+        return if (System.getProperty("os.name").startsWith("Windows")) {
             File(System.getenv("LOCALAPPDATA")+"\\Android\\Sdk")
         } else {
             File(System.getProperty("user.home")+"/Android/Sdk/")
         }
+    }
+
+
+    @Test
+    fun check_kotlin() {
 
         lint()
-            .sdkHome(sdkPath)
+            .sdkHome(getSdk())
             .issues(ISSUE_PATTERN)
-            .files(testFileKotlin)
+            .files(TestClassKotlin)
             .run()
             .expect("")
 
     }
 
+    @Test
+    fun check_kotlin_coroutines() {
+
+        lint()
+            .sdkHome(getSdk())
+            .issues(ISSUE_PATTERN)
+            .files(
+                KotlinCallClass,
+                KotlinCallbackInterface,
+                KotlinErrorsClass,
+                KotlinResponseClass,
+                KotlinCheckClass,
+                KotlinCoroutineMock
+            ).run()
+            .expect("")
+
+    }
 }

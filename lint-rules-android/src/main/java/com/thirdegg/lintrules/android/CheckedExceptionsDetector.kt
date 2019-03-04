@@ -62,6 +62,25 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
             }
 
             uMethod.accept(object:AbstractUastVisitor() {
+                override fun visitCallExpression(node: UCallExpression): Boolean {
+                    if (node.uastParent !is UCallExpression) return super.visitCallExpression(node)
+                    val parentResolve = (node.uastParent as UCallExpression).resolve()
+                    val resolve = node.resolve()
+                    if (parentResolve?.containingClass?.qualifiedName != "kotlin.coroutines.Continuation"
+                        && parentResolve?.containingClass?.qualifiedName != "com.thirdegg.lintrules.android.Continuation")
+                        return super.visitCallExpression(node)
+
+                    if ((node.uastParent as UCallExpression?)?.methodName!="resumeWithException") return super.visitCallExpression(node)
+
+                    val clazzName = resolve?.containingClass?.qualifiedName?:return super.visitCallExpression(node)
+                    context.report(ISSUE_PATTERN, parrentNode, context.getNameLocation(parrentNode),
+                            "Exception not checked: $clazzName")
+
+                    return super.visitCallExpression(node)
+                }
+            })
+
+            uMethod.accept(object:AbstractUastVisitor() {
 
                 override fun visitThrowExpression(node: UThrowExpression): Boolean {
 
