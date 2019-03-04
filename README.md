@@ -18,7 +18,7 @@ and to module ```build.gradle```:
 ```gradle
 dependencies {
     ...
-    lintChecks('com.github.thirdegg:lint-rules:0.0.1-alpha')
+    lintChecks('com.github.thirdegg:lint-rules:0.0.2-alpha')
 }
 ```
 
