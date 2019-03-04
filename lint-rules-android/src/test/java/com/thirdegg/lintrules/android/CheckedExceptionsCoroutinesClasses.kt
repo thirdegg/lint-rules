@@ -13,7 +13,7 @@ object CheckedExceptionsCoroutinesClasses {
                     callback.onResponse(Response())
                 }
 
-                fun await():String = Helper.suspendCoroutine { cont:Continuation ->
+                fun await():String = suspendCoroutine { cont ->
                     enqueue(object: Callback {
 
                         override fun onResponse(response: Response) {
@@ -87,7 +87,6 @@ object CheckedExceptionsCoroutinesClasses {
 
             package com.thirdegg.lintrules.android
 
-            import java.lang.Exception
 
             class NotAuthorizedException(error: String):Exception(error)
             class ForbiddenException(error: String):Exception(error)
@@ -105,7 +104,11 @@ object CheckedExceptionsCoroutinesClasses {
             class Main {
 
                 fun check() {
-                    Call().await()
+                    try {
+                        Call().await()
+                    } catch (e:Exception) {
+                        e.printStackTrace()
+                    }
                 }
 
             }
@@ -130,15 +133,14 @@ object CheckedExceptionsCoroutinesClasses {
                 }
             }
 
-            object Helper {
 
-                fun suspendCoroutine(block: (count:Continuation) -> Unit): String {
-                    val cont = Continuation()
-                    block(cont)
-                    return cont.result
-                }
-
+            suspend inline fun suspendCoroutine(crossinline block: (Continuation) -> Unit): String {
+                val cont = Continuation()
+                block(cont)
+                return cont.result
             }
+
+
 
     """).indented()
 

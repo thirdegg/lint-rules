@@ -43,65 +43,91 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
     override fun createUastHandler(context: JavaContext) = object:UElementHandler() {
 
         init {
-            println(context.uastFile?.asRecursiveLogString())
+//            println(context.uastFile?.asRecursiveLogString())
         }
 
         override fun visitCallExpression(node: UCallExpression) {
 
             val parrentNode = node
-            val method = parrentNode.resolve()?:return
+            val method = parrentNode.resolve() ?: return
             val uMethod = context.uastContext.getMethod(method)
 
             val haveTryCatch = ArrayList<String>()
 
-            val tryException = findParrentByUast(parrentNode,UTryExpression::class.java)
-            if (tryException!=null) {
+            val tryException = findParrentByUast(parrentNode, UTryExpression::class.java)
+            if (tryException != null) {
                 for (catchCause in tryException.catchClauses) {
                     haveTryCatch.add(findExceptionClassName(catchCause))
                 }
             }
 
-            uMethod.accept(object:AbstractUastVisitor() {
+            uMethod.accept(object : AbstractUastVisitor() {
                 override fun visitCallExpression(node: UCallExpression): Boolean {
                     if (node.uastParent !is UCallExpression) return super.visitCallExpression(node)
                     val parentResolve = (node.uastParent as UCallExpression).resolve()
                     val resolve = node.resolve()
-                    if (parentResolve?.containingClass?.qualifiedName != "kotlin.coroutines.Continuation"
-                        && parentResolve?.containingClass?.qualifiedName != "com.thirdegg.lintrules.android.Continuation")
+                    if (parentResolve?.containingClass?.qualifiedName?.contains("Continuation") != true) {
+                        return super.visitCallExpression(node)
+                    }
+
+                    if ((node.uastParent as UCallExpression?)?.methodName != "resumeWithException")
                         return super.visitCallExpression(node)
 
-                    if ((node.uastParent as UCallExpression?)?.methodName!="resumeWithException") return super.visitCallExpression(node)
+                    val clazzName = resolve?.containingClass?.qualifiedName
+                            ?: return super.visitCallExpression(node)
 
-                    val clazzName = resolve?.containingClass?.qualifiedName?:return super.visitCallExpression(node)
+                    if (haveTryCatch.contains(clazzName))
+                        return super.visitCallExpression(node)
+
+                    var superClass = resolve.containingClass?.superClass
+                    while (superClass!=null) {
+                        if (haveTryCatch.contains(superClass.qualifiedName))
+                            return super.visitCallExpression(node)
+                        superClass = superClass.superClass
+                    }
+
                     context.report(ISSUE_PATTERN, parrentNode, context.getNameLocation(parrentNode),
                             "Exception not checked: $clazzName")
+
+                    println(clazzName)
 
                     return super.visitCallExpression(node)
                 }
             })
 
-            uMethod.accept(object:AbstractUastVisitor() {
+            uMethod.accept(object : AbstractUastVisitor() {
 
                 override fun visitThrowExpression(node: UThrowExpression): Boolean {
 
-                    node.accept(object:AbstractUastVisitor() {
+                    node.accept(object : AbstractUastVisitor() {
+
                         override fun visitCallExpression(node: UCallExpression): Boolean {
                             if (node is KotlinUFunctionCallExpression) {
                                 //TODO kotlin.Exception() not catch
                                 val clazz = node.resolve()
-                                val clazzName = clazz?.containingClass?.qualifiedName
-                                if (clazzName==null || haveTryCatch.contains(clazzName)) return super.visitCallExpression(node)
-                                context.report(ISSUE_PATTERN, parrentNode, context.getNameLocation(parrentNode),
-                                        "Exception not checked: $clazzName")
+                                val clazzName = clazz?.containingClass?.qualifiedName?:return super.visitCallExpression(node)
+                                if (haveTryCatch.contains(clazzName)) return super.visitCallExpression(node)
+
+                                var superClass = clazz.containingClass?.superClass
+                                while (superClass!=null) {
+                                    if (haveTryCatch.contains(superClass?.qualifiedName))
+                                        return super.visitCallExpression(node)
+                                    superClass = superClass?.superClass
+                                }
+
+                                context.report(ISSUE_PATTERN, parrentNode, context.getNameLocation(parrentNode),"Exception not checked: $clazzName")
                             }
                             return super.visitCallExpression(node)
                         }
+
                     })
+
                     return super.visitThrowExpression(node)
                 }
 
             })
         }
+
 
     }
 }
