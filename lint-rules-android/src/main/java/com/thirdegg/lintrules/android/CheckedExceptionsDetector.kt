@@ -43,7 +43,7 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
     override fun createUastHandler(context: JavaContext) = object:UElementHandler() {
 
         init {
-//            println(context.uastFile?.asRecursiveLogString())
+            println(context.uastFile?.asRecursiveLogString())
         }
 
         override fun visitCallExpression(node: UCallExpression) {
@@ -61,6 +61,43 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
                 }
             }
 
+            //throws
+            uMethod.accept(object : AbstractUastVisitor() {
+                override fun visitAnnotation(node: UAnnotation): Boolean {
+
+                    if (node.qualifiedName!="kotlin.jvm.Throws") return super.visitAnnotation(node)
+                    node.accept(object : AbstractUastVisitor() {
+
+                        override fun visitClassLiteralExpression(node: UClassLiteralExpression): Boolean {
+
+                            val clazzName = node.type?.canonicalText?:return super.visitClassLiteralExpression(node)
+
+                            if (haveTryCatch.contains(clazzName))
+                                return super.visitClassLiteralExpression(node)
+
+                            val uClass = context.uastContext.getClass(node.getContainingUClass()!!)
+
+                            var superClass = uClass.superClass
+                            while (superClass!=null) {
+                                if (haveTryCatch.contains(superClass.qualifiedName))
+                                    return super.visitClassLiteralExpression(node)
+                                superClass = superClass.superClass
+                            }
+//
+                            context.report(ISSUE_PATTERN, parrentNode, context.getNameLocation(parrentNode),
+                                    "Exception not checked: $clazzName")
+
+                            return super.visitClassLiteralExpression(node)
+                        }
+
+                    })
+
+                    return super.visitAnnotation(node)
+                }
+
+            })
+
+            //coroutines
             uMethod.accept(object : AbstractUastVisitor() {
                 override fun visitCallExpression(node: UCallExpression): Boolean {
                     if (node.uastParent !is UCallExpression) return super.visitCallExpression(node)
@@ -81,15 +118,13 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
 
                     var superClass = resolve.containingClass?.superClass
                     while (superClass!=null) {
-                        if (haveTryCatch.contains(superClass.qualifiedName))
+                        if (haveTryCatch.contains(superClass?.qualifiedName))
                             return super.visitCallExpression(node)
-                        superClass = superClass.superClass
+                        superClass = superClass?.superClass
                     }
 
                     context.report(ISSUE_PATTERN, parrentNode, context.getNameLocation(parrentNode),
                             "Exception not checked: $clazzName")
-
-                    println(clazzName)
 
                     return super.visitCallExpression(node)
                 }

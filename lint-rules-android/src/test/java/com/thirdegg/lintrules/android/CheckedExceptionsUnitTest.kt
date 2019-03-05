@@ -3,17 +3,21 @@ package com.thirdegg.lintrules.android
 import org.junit.Test
 
 import com.android.tools.lint.checks.infrastructure.TestLintTask.lint
-import com.thirdegg.lintrules.android.CheckedExceptionsClasses.TestClassKotlin
+import com.thirdegg.lintrules.android.checkedexceptions.SimpleTestClasses.TestClassKotlin
 
-import com.thirdegg.lintrules.android.CheckedExceptionsCoroutinesClasses.KotlinCallClass
-import com.thirdegg.lintrules.android.CheckedExceptionsCoroutinesClasses.KotlinCallbackInterface
-import com.thirdegg.lintrules.android.CheckedExceptionsCoroutinesClasses.KotlinCheckClass
-import com.thirdegg.lintrules.android.CheckedExceptionsCoroutinesClasses.KotlinCoroutineMock
-import com.thirdegg.lintrules.android.CheckedExceptionsCoroutinesClasses.KotlinErrorsClass
-import com.thirdegg.lintrules.android.CheckedExceptionsCoroutinesClasses.KotlinResponseClass
+import com.thirdegg.lintrules.android.checkedexceptions.CoroutinesTestClasses.KotlinCallClass
+import com.thirdegg.lintrules.android.checkedexceptions.CoroutinesTestClasses.KotlinCallbackInterface
+import com.thirdegg.lintrules.android.checkedexceptions.CoroutinesTestClasses.KotlinCheckClass
+import com.thirdegg.lintrules.android.checkedexceptions.CoroutinesTestClasses.KotlinCoroutineMock
+import com.thirdegg.lintrules.android.checkedexceptions.CoroutinesTestClasses.KotlinErrorsClass
+import com.thirdegg.lintrules.android.checkedexceptions.CoroutinesTestClasses.KotlinResponseClass
+
+
+import com.thirdegg.lintrules.android.checkedexceptions.ThrowsTestClasses.ThrowsClassJava
+import com.thirdegg.lintrules.android.checkedexceptions.ThrowsTestClasses.ThrowsExceptionsKotlin
+import com.thirdegg.lintrules.android.checkedexceptions.ThrowsTestClasses.ThrowsInterfaceKotlin
 
 import java.io.File
-import java.net.URI
 
 class CheckedExceptionsUnitTest {
 
@@ -52,6 +56,21 @@ class CheckedExceptionsUnitTest {
                 KotlinResponseClass,
                 KotlinCheckClass,
                 KotlinCoroutineMock
+            ).run()
+            .expect("")
+
+    }
+
+    @Test
+    fun check_kotlin_throws() {
+
+        lint()
+            .sdkHome(getSdk())
+            .issues(ISSUE_PATTERN)
+            .files(
+                ThrowsClassJava,
+                ThrowsExceptionsKotlin,
+                ThrowsInterfaceKotlin
             ).run()
             .expect("")
 

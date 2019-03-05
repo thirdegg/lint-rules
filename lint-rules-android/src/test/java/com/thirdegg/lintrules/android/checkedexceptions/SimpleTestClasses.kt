@@ -1,8 +1,8 @@
-package com.thirdegg.lintrules.android
+package com.thirdegg.lintrules.android.checkedexceptions
 
 import com.android.tools.lint.checks.infrastructure.TestFiles
 
-object CheckedExceptionsClasses {
+object SimpleTestClasses {
 
     val TestClassKotlin = TestFiles.kotlin("""
 
