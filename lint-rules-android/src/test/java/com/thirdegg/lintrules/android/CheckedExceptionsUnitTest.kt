@@ -73,7 +73,12 @@ class CheckedExceptionsUnitTest {
                 ThrowsExceptionsKotlin,
                 ThrowsInterfaceKotlin
             ).run()
-            .expect("")
+            .expect("""
+                src/com/thirdegg/lintrules/android/ThrowsClassJava.kt:24: Warning: Exception not checked: com.thirdegg.lintrules.android.ThrowsTwoException [CheckedExceptions]
+                            test()
+                            ~~~~
+                0 errors, 1 warnings
+            """.trimIndent())
 
     }
 }

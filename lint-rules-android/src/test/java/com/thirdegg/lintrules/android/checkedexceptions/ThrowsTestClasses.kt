@@ -49,10 +49,18 @@ object ThrowsTestClasses {
                     ThrowsInterfaceKotlin().tryTwo()
                 }
 
-
+                @Throws(ThrowsException::class,ThrowsTwoException::class)
                 fun test() {
                     tryTwo()
                     tryThree()
+                }
+
+                fun test2() {
+                    try {
+                        test()
+                    } catch(e:ThrowsException) {
+
+                    }
                 }
 
             }

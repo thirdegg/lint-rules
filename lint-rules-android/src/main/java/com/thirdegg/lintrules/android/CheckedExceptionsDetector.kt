@@ -22,7 +22,6 @@ val ISSUE_PATTERN = Issue.create("CheckedExceptions",
 
 class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
 
-
     override fun getApplicableUastTypes() = listOf<Class<out UElement>>(UCallExpression::class.java)
 
     fun <T : UElement> findParrentByUast(item:UElement, clazz:Class<T>):T? {
@@ -62,7 +61,7 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
     override fun createUastHandler(context: JavaContext) = object:UElementHandler() {
 
         init {
-            println(context.uastFile?.asRecursiveLogString())
+//            println(context.uastFile?.asRecursiveLogString())
         }
 
         override fun visitCallExpression(node: UCallExpression) {
@@ -77,6 +76,18 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
             if (tryException != null) {
                 for (catchCause in tryException.catchClauses) {
                     haveTryCatch.add(findExceptionClassName(catchCause))
+                }
+            }
+
+            val parent = findParrentByUast(parrentNode,UAnnotationMethod::class.java)
+            if (parent!=null) {
+                for (annotation in parent.annotations) {
+                    if (annotation.qualifiedName != "kotlin.jvm.Throws") continue
+                    val throwsExceptions = findNamedExpressionsInAnnotation(annotation)
+                    for (throwsException in throwsExceptions) {
+                        throwsException ?: continue
+                        if (!haveTryCatch.contains(throwsException)) haveTryCatch.add(throwsException)
+                    }
                 }
             }
 
@@ -150,6 +161,7 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
                 }
             })
 
+            //throw
             uMethod.accept(object : AbstractUastVisitor() {
 
                 override fun visitThrowExpression(node: UThrowExpression): Boolean {
@@ -169,31 +181,7 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
                                         return super.visitCallExpression(node)
                                     superClass = superClass?.superClass
                                 }
-
-                                val parent = findParrentByUast(parrentNode,UAnnotationMethod::class.java)
-
-                                println(clazzName)
-
-                                if (parent?.annotations?.isNotEmpty()==true) {
-                                    for (annotation in parent.annotations) {
-                                        if (annotation.qualifiedName != "kotlin.jvm.Throws") continue
-
-                                        if (findNamedExpressionsInAnnotation(annotation).contains(clazzName)) return super.visitCallExpression(node)
-                                        val uClass = context.uastContext.getClass(node.getContainingUClass()!!)
-
-                                        var annotationSuperClass: UClass? = uClass
-                                        while (superClass != null) {
-                                            if (haveTryCatch.contains(annotationSuperClass?.qualifiedName)) return super.visitCallExpression(node)
-                                            annotationSuperClass = annotationSuperClass?.superClass
-                                        }
-
-                                        context.report(ISSUE_PATTERN, parrentNode, context.getNameLocation(parrentNode),
-                                                "Exception not checked: $clazzName")
-
-                                    }
-                                } else {
-                                    context.report(ISSUE_PATTERN, parrentNode, context.getNameLocation(parrentNode), "Exception not checked: $clazzName")
-                                }
+                                context.report(ISSUE_PATTERN, parrentNode, context.getNameLocation(parrentNode), "Exception not checked: $clazzName")
                             }
                             return super.visitCallExpression(node)
                         }
