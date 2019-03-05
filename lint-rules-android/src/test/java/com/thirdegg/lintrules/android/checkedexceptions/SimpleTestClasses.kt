@@ -19,6 +19,7 @@ object SimpleTestClasses {
                 }
 
                 fun tryCatch() {
+                    test()
                     try {
                         test()
                     } catch (e:TextExceptionKotlin) {

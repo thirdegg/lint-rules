@@ -40,6 +40,25 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
         return catchClause.parameters[0].psi.type.canonicalText
     }
 
+    fun findNamedExpressionsInAnnotation(uAnnotation: UAnnotation):ArrayList<String?> {
+        val namedExpressions = ArrayList<String?>()
+        for (uNamedExpression in uAnnotation.attributeValues) {
+            if (uNamedExpression.expression is UClassLiteralExpression) {
+                namedExpressions.add((uNamedExpression.expression as UClassLiteralExpression).type?.canonicalText)
+                continue
+            }
+            if (uNamedExpression.expression is UCallExpression) {
+                for (argument in (uNamedExpression.expression as UCallExpression).valueArguments) {
+                    if (argument is UClassLiteralExpression) {
+                        namedExpressions.add(argument.type?.canonicalText)
+                        continue
+                    }
+                }
+            }
+        }
+        return namedExpressions
+    }
+
     override fun createUastHandler(context: JavaContext) = object:UElementHandler() {
 
         init {
@@ -66,6 +85,7 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
                 override fun visitAnnotation(node: UAnnotation): Boolean {
 
                     if (node.qualifiedName!="kotlin.jvm.Throws") return super.visitAnnotation(node)
+
                     node.accept(object : AbstractUastVisitor() {
 
                         override fun visitClassLiteralExpression(node: UClassLiteralExpression): Boolean {
@@ -77,13 +97,13 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
 
                             val uClass = context.uastContext.getClass(node.getContainingUClass()!!)
 
-                            var superClass = uClass.superClass
+                            var superClass:UClass? = uClass
                             while (superClass!=null) {
                                 if (haveTryCatch.contains(superClass.qualifiedName))
                                     return super.visitClassLiteralExpression(node)
                                 superClass = superClass.superClass
                             }
-//
+
                             context.report(ISSUE_PATTERN, parrentNode, context.getNameLocation(parrentNode),
                                     "Exception not checked: $clazzName")
 
@@ -150,7 +170,30 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
                                     superClass = superClass?.superClass
                                 }
 
-                                context.report(ISSUE_PATTERN, parrentNode, context.getNameLocation(parrentNode),"Exception not checked: $clazzName")
+                                val parent = findParrentByUast(parrentNode,UAnnotationMethod::class.java)
+
+                                println(clazzName)
+
+                                if (parent?.annotations?.isNotEmpty()==true) {
+                                    for (annotation in parent.annotations) {
+                                        if (annotation.qualifiedName != "kotlin.jvm.Throws") continue
+
+                                        if (findNamedExpressionsInAnnotation(annotation).contains(clazzName)) return super.visitCallExpression(node)
+                                        val uClass = context.uastContext.getClass(node.getContainingUClass()!!)
+
+                                        var annotationSuperClass: UClass? = uClass
+                                        while (superClass != null) {
+                                            if (haveTryCatch.contains(annotationSuperClass?.qualifiedName)) return super.visitCallExpression(node)
+                                            annotationSuperClass = annotationSuperClass?.superClass
+                                        }
+
+                                        context.report(ISSUE_PATTERN, parrentNode, context.getNameLocation(parrentNode),
+                                                "Exception not checked: $clazzName")
+
+                                    }
+                                } else {
+                                    context.report(ISSUE_PATTERN, parrentNode, context.getNameLocation(parrentNode), "Exception not checked: $clazzName")
+                                }
                             }
                             return super.visitCallExpression(node)
                         }

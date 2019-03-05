@@ -8,14 +8,16 @@ object ThrowsTestClasses {
 
             package com.thirdegg.lintrules.android
 
-            interface ThrowsInterfaceKotlin {
+            class ThrowsInterfaceKotlin {
 
-                @Throws(Exception::class,ThrowsException::class)
-                fun tryOne()
+                fun tryOne() {
+                    throw ThrowsException()
+                }
 
-                @Throws(ThrowsException::class)
-                fun tryTwo()
-
+                fun tryTwo() {
+                    throw ThrowsException()
+                    throw ThrowsTwoException()
+                }
             }
 
         """).indented()
@@ -24,7 +26,10 @@ object ThrowsTestClasses {
 
             package com.thirdegg.lintrules.android
 
+            import java.lang.Exception
+
             class ThrowsException:Exception("ThrowsException")
+            class ThrowsTwoException:Exception("ThrowsException")
 
         """).indented()
 
@@ -32,21 +37,24 @@ object ThrowsTestClasses {
 
             package com.thirdegg.lintrules.android
 
-            class ThrowsClassJava(val throwsInterfaceKotlin:ThrowsInterfaceKotlin) {
+            class ThrowsClassJava {
+
+                @Throws(ThrowsException::class)
+                fun tryTwo() {
+                    ThrowsInterfaceKotlin().tryOne()
+                }
+
+                @Throws(ThrowsException::class,ThrowsTwoException::class)
+                fun tryThree() {
+                    ThrowsInterfaceKotlin().tryTwo()
+                }
+
 
                 fun test() {
-
-                    throwsInterfaceKotlin.tryOne()
-
-                    throwsInterfaceKotlin.tryTwo()
-
-                    try {
-                        throwsInterfaceKotlin.tryOne()
-                    } catch (e:ThrowsException) {
-                        e.printStackTrace()
-                    }
-
+                    tryTwo()
+                    tryThree()
                 }
+
             }
 
 

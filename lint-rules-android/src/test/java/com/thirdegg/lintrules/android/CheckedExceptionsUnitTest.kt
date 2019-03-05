@@ -17,6 +17,7 @@ import com.thirdegg.lintrules.android.checkedexceptions.ThrowsTestClasses.Throws
 import com.thirdegg.lintrules.android.checkedexceptions.ThrowsTestClasses.ThrowsExceptionsKotlin
 import com.thirdegg.lintrules.android.checkedexceptions.ThrowsTestClasses.ThrowsInterfaceKotlin
 
+
 import java.io.File
 
 class CheckedExceptionsUnitTest {
