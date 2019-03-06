@@ -66,32 +66,31 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
 
         override fun visitCallExpression(node: UCallExpression) {
 
-            val parrentNode = node
-            val method = parrentNode.resolve() ?: return
+            val parentNode = node
+            val method = parentNode.resolve() ?: return
             val uMethod = context.uastContext.getMethod(method)
 
             val haveTryCatch = ArrayList<String>()
 
-            val tryException = findParrentByUast(parrentNode, UTryExpression::class.java)
-            if (tryException != null) {
+            findParrentByUast(parentNode, UTryExpression::class.java).also { tryException ->
+                tryException?.catchClauses?:return@also
                 for (catchCause in tryException.catchClauses) {
                     haveTryCatch.add(findExceptionClassName(catchCause))
                 }
             }
 
-            val parent = findParrentByUast(parrentNode,UAnnotationMethod::class.java)
-            if (parent!=null) {
-                for (annotation in parent.annotations) {
+
+            findParrentByUast(parentNode,UAnnotationMethod::class.java)?.also { throwsAnnotation->
+                for (annotation in throwsAnnotation.annotations) {
                     if (annotation.qualifiedName != "kotlin.jvm.Throws") continue
-                    val throwsExceptions = findNamedExpressionsInAnnotation(annotation)
-                    for (throwsException in throwsExceptions) {
+                    for (throwsException in findNamedExpressionsInAnnotation(annotation)) {
                         throwsException ?: continue
                         if (!haveTryCatch.contains(throwsException)) haveTryCatch.add(throwsException)
                     }
                 }
             }
 
-            //throws
+            //find throws annotation in method
             uMethod.accept(object : AbstractUastVisitor() {
                 override fun visitAnnotation(node: UAnnotation): Boolean {
 
@@ -115,7 +114,7 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
                                 superClass = superClass.superClass
                             }
 
-                            context.report(ISSUE_PATTERN, parrentNode, context.getNameLocation(parrentNode),
+                            context.report(ISSUE_PATTERN, parentNode, context.getNameLocation(parentNode),
                                     "Exception not checked: $clazzName")
 
                             return super.visitClassLiteralExpression(node)
@@ -128,7 +127,7 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
 
             })
 
-            //coroutines
+            //find in suspendCoroutine resumeWithException
             uMethod.accept(object : AbstractUastVisitor() {
                 override fun visitCallExpression(node: UCallExpression): Boolean {
                     if (node.uastParent !is UCallExpression) return super.visitCallExpression(node)
@@ -154,14 +153,14 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
                         superClass = superClass?.superClass
                     }
 
-                    context.report(ISSUE_PATTERN, parrentNode, context.getNameLocation(parrentNode),
+                    context.report(ISSUE_PATTERN, parentNode, context.getNameLocation(parentNode),
                             "Exception not checked: $clazzName")
 
                     return super.visitCallExpression(node)
                 }
             })
 
-            //throw
+            //find throw in method
             uMethod.accept(object : AbstractUastVisitor() {
 
                 override fun visitThrowExpression(node: UThrowExpression): Boolean {
@@ -181,7 +180,7 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
                                         return super.visitCallExpression(node)
                                     superClass = superClass?.superClass
                                 }
-                                context.report(ISSUE_PATTERN, parrentNode, context.getNameLocation(parrentNode), "Exception not checked: $clazzName")
+                                context.report(ISSUE_PATTERN, parentNode, context.getNameLocation(parentNode), "Exception not checked: $clazzName")
                             }
                             return super.visitCallExpression(node)
                         }
