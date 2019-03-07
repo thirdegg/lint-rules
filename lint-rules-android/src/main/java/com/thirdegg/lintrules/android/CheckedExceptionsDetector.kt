@@ -24,7 +24,7 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
 
     override fun getApplicableUastTypes() = listOf<Class<out UElement>>(UCallExpression::class.java)
 
-    fun <T : UElement> findParrentByUast(item:UElement, clazz:Class<T>):T? {
+    fun <T : UElement> findParentByUast(item:UElement, clazz:Class<T>):T? {
         var parent = item.uastParent
         while (parent!=null) {
             if (clazz.isInstance(parent)) {
@@ -72,7 +72,7 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
 
             val haveTryCatch = ArrayList<String>()
 
-            findParrentByUast(parentNode, UTryExpression::class.java).also { tryException ->
+            findParentByUast(parentNode, UTryExpression::class.java).also { tryException ->
                 tryException?.catchClauses?:return@also
                 for (catchCause in tryException.catchClauses) {
                     haveTryCatch.add(findExceptionClassName(catchCause))
@@ -80,7 +80,7 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
             }
 
 
-            findParrentByUast(parentNode,UAnnotationMethod::class.java)?.also { throwsAnnotation->
+            findParentByUast(parentNode,UAnnotationMethod::class.java)?.also { throwsAnnotation->
                 for (annotation in throwsAnnotation.annotations) {
                     if (annotation.qualifiedName != "kotlin.jvm.Throws") continue
                     for (throwsException in findNamedExpressionsInAnnotation(annotation)) {
@@ -105,19 +105,16 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
                             if (haveTryCatch.contains(clazzName))
                                 return super.visitClassLiteralExpression(node)
 
-                            val uClass = context.uastContext.getClass(node.getContainingUClass()!!)
-
-                            var superClass:UClass? = uClass
-                            while (superClass!=null) {
-                                if (haveTryCatch.contains(superClass.qualifiedName))
+                            node.type?.superTypes?.forEach {
+                                if (haveTryCatch.contains(it.canonicalText))
                                     return super.visitClassLiteralExpression(node)
-                                superClass = superClass.superClass
                             }
 
                             context.report(ISSUE_PATTERN, parentNode, context.getNameLocation(parentNode),
-                                    "Exception not checked: $clazzName")
+                                    "Unhandled exception: $clazzName")
 
                             return super.visitClassLiteralExpression(node)
+
                         }
 
                     })
@@ -148,13 +145,13 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
 
                     var superClass = resolve.containingClass?.superClass
                     while (superClass!=null) {
-                        if (haveTryCatch.contains(superClass?.qualifiedName))
+                        if (haveTryCatch.contains(superClass.qualifiedName))
                             return super.visitCallExpression(node)
-                        superClass = superClass?.superClass
+                        superClass = superClass.superClass
                     }
 
                     context.report(ISSUE_PATTERN, parentNode, context.getNameLocation(parentNode),
-                            "Exception not checked: $clazzName")
+                            "Unhandled exception: $clazzName")
 
                     return super.visitCallExpression(node)
                 }
@@ -180,7 +177,7 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
                                         return super.visitCallExpression(node)
                                     superClass = superClass?.superClass
                                 }
-                                context.report(ISSUE_PATTERN, parentNode, context.getNameLocation(parentNode), "Exception not checked: $clazzName")
+                                context.report(ISSUE_PATTERN, parentNode, context.getNameLocation(parentNode), "Unhandled exception: $clazzName")
                             }
                             return super.visitCallExpression(node)
                         }
