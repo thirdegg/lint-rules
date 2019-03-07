@@ -30,6 +30,7 @@ object ThrowsTestClasses {
 
             class ThrowsException:Exception("ThrowsException")
             class ThrowsTwoException:Exception("ThrowsException")
+            class ThrowsThreeException:ThrowsTwoException()
 
         """).indented()
 
@@ -49,7 +50,7 @@ object ThrowsTestClasses {
                     ThrowsInterfaceKotlin().tryTwo()
                 }
 
-                @Throws(ThrowsException::class,ThrowsTwoException::class)
+                @Throws(ThrowsException::class,ThrowsTwoException::class,ThrowsThreeException::class)
                 fun test() {
                     tryTwo()
                     tryThree()

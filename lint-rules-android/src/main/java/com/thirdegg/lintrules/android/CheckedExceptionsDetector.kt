@@ -4,11 +4,13 @@ import com.android.tools.lint.detector.api.Category.Companion.CORRECTNESS
 import com.android.tools.lint.detector.api.Severity.WARNING
 import com.android.tools.lint.client.api.UElementHandler
 import com.android.tools.lint.detector.api.*
+import com.intellij.psi.PsiType
 import org.jetbrains.uast.*
 import org.jetbrains.uast.kotlin.KotlinUFunctionCallExpression
 import java.util.*
 import org.jetbrains.uast.visitor.AbstractUastVisitor
 import kotlin.collections.ArrayList
+import kotlin.collections.HashSet
 
 
 val ISSUE_PATTERN = Issue.create("CheckedExceptions",
@@ -58,6 +60,15 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
         return namedExpressions
     }
 
+    fun findRecursiveExtentionsInClass(superTypes: Array<PsiType>):HashSet<String> {
+        val classes = HashSet<String>()
+        superTypes.forEach {
+            classes.addAll(findRecursiveExtentionsInClass(it.superTypes))
+            classes.add(it.canonicalText)
+        }
+        return classes
+    }
+
     override fun createUastHandler(context: JavaContext) = object:UElementHandler() {
 
         init {
@@ -100,13 +111,21 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
 
                         override fun visitClassLiteralExpression(node: UClassLiteralExpression): Boolean {
 
+                            val arrayList = ArrayList<String>()
+
                             val clazzName = node.type?.canonicalText?:return super.visitClassLiteralExpression(node)
+
+                            arrayList.add(clazzName)
 
                             if (haveTryCatch.contains(clazzName))
                                 return super.visitClassLiteralExpression(node)
 
-                            node.type?.superTypes?.forEach {
-                                if (haveTryCatch.contains(it.canonicalText))
+                            if (node.type?.superTypes!=null) {
+                                arrayList.addAll(findRecursiveExtentionsInClass(node.type?.superTypes!!))
+                            }
+
+                            for (clazz in arrayList) {
+                                if (haveTryCatch.contains(clazz))
                                     return super.visitClassLiteralExpression(node)
                             }
 
