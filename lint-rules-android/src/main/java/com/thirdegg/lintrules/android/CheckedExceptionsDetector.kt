@@ -143,38 +143,6 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
 
             })
 
-            //find in suspendCoroutine resumeWithException
-            uMethod.accept(object : AbstractUastVisitor() {
-                override fun visitCallExpression(node: UCallExpression): Boolean {
-                    if (node.uastParent !is UCallExpression) return super.visitCallExpression(node)
-                    val parentResolve = (node.uastParent as UCallExpression).resolve()
-                    val resolve = node.resolve()
-                    if (parentResolve?.containingClass?.qualifiedName?.contains("Continuation") != true) {
-                        return super.visitCallExpression(node)
-                    }
-
-                    if ((node.uastParent as UCallExpression?)?.methodName != "resumeWithException")
-                        return super.visitCallExpression(node)
-
-                    val clazzName = resolve?.containingClass?.qualifiedName
-                            ?: return super.visitCallExpression(node)
-
-                    if (haveTryCatch.contains(clazzName))
-                        return super.visitCallExpression(node)
-
-                    var superClass = resolve.containingClass?.superClass
-                    while (superClass!=null) {
-                        if (haveTryCatch.contains(superClass.qualifiedName))
-                            return super.visitCallExpression(node)
-                        superClass = superClass.superClass
-                    }
-
-                    context.report(ISSUE_PATTERN, parentNode, context.getNameLocation(parentNode),
-                            "Unhandled exception: $clazzName")
-
-                    return super.visitCallExpression(node)
-                }
-            })
 
             //find throw in method
             uMethod.accept(object : AbstractUastVisitor() {
