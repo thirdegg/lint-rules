@@ -41,8 +41,8 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
         return catchClause.parameters[0].psi.type.canonicalText
     }
 
-    fun findNamedExpressionsInAnnotation(uAnnotation: UAnnotation): ArrayList<String?> {
-        val namedExpressions = ArrayList<String?>()
+    fun findNamedExpressionsInAnnotation(uAnnotation: UAnnotation): HashSet<String?> {
+        val namedExpressions = HashSet<String?>()
         for (uNamedExpression in uAnnotation.attributeValues) {
             if (uNamedExpression.expression is UClassLiteralExpression) {
                 // If UClassLiteralExpression.type.canonicalText is null then maybe no import of Exception
@@ -98,7 +98,7 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
                     if (annotation.qualifiedName != "kotlin.jvm.Throws") continue
                     for (throwsException in findNamedExpressionsInAnnotation(annotation)) {
                         throwsException ?: continue
-                        if (ignoreCatch.contains(throwsException)) continue;
+                        if (ignoreCatch.contains(throwsException)) continue
                         ignoreCatch.add(throwsException)
                     }
                 }
@@ -147,9 +147,6 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
 
                     return super.visitAnnotation(node)
                 }
-            })
-
-            uMethod.accept(object : AbstractUastVisitor() {
 
                 // Find throw in method
                 override fun visitThrowExpression(node: UThrowExpression): Boolean {
