@@ -24,6 +24,8 @@ val ISSUE_PATTERN = Issue.create(
 
 class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
 
+    val ignoreCatch = HashSet<String>()
+
     override fun getApplicableUastTypes() = listOf<Class<out UElement>>(UCallExpression::class.java)
 
     fun <T : UElement> findParentByUast(item: UElement, clazz: Class<T>): T? {
@@ -81,8 +83,6 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
             val parentNode = node
             val method = parentNode.resolve() ?: return
             val uMethod = context.uastContext.getMethod(method)
-
-            val ignoreCatch = HashSet<String>()
 
             // Has try/catch expression
             findParentByUast(parentNode, UTryExpression::class.java).also { tryException ->
