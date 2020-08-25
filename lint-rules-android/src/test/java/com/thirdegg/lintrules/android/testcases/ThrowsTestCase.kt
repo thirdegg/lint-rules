@@ -1,8 +1,12 @@
-package com.thirdegg.lintrules.android.checkedexceptions
+package com.thirdegg.lintrules.android.testcases
 
 import com.android.tools.lint.checks.infrastructure.TestFiles
+import com.android.tools.lint.checks.infrastructure.TestLintTask
+import com.thirdegg.lintrules.android.ISSUE_PATTERN
+import com.thirdegg.lintrules.android.Utils
+import org.junit.Test
 
-object ThrowsTestClasses {
+class ThrowsTestCase {
 
     val ThrowsInterfaceKotlin = TestFiles.kotlin("""
 
@@ -68,5 +72,29 @@ object ThrowsTestClasses {
 
 
         """).indented()
+
+
+    @Test
+    fun check_kotlin_throws() {
+
+        TestLintTask.lint()
+            .sdkHome(Utils.getSdk())
+            .issues(ISSUE_PATTERN)
+            .files(
+                ThrowsClassJava,
+                ThrowsExceptionsKotlin,
+                ThrowsInterfaceKotlin
+            ).run()
+            .expect("""
+                src/com/thirdegg/lintrules/android/ThrowsClassJava.kt:24: Warning: Unhandled exception: com.thirdegg.lintrules.android.ThrowsThreeException [CheckedExceptions]
+                            test()
+                            ~~~~
+                src/com/thirdegg/lintrules/android/ThrowsClassJava.kt:24: Warning: Unhandled exception: com.thirdegg.lintrules.android.ThrowsTwoException [CheckedExceptions]
+                            test()
+                            ~~~~
+                0 errors, 2 warnings
+            """.trimIndent())
+
+    }
 
 }
