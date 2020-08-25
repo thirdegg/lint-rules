@@ -24,8 +24,6 @@ val ISSUE_PATTERN = Issue.create(
 
 class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
 
-    val ignoreCatch = HashSet<String>()
-
     override fun getApplicableUastTypes() = listOf<Class<out UElement>>(UCallExpression::class.java)
 
     fun <T : UElement> findParentByUast(item: UElement, clazz: Class<T>): T? {
@@ -84,26 +82,6 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
             val method = parentNode.resolve() ?: return
             val uMethod = context.uastContext.getMethod(method)
 
-            // Has try/catch expression
-            findParentByUast(parentNode, UTryExpression::class.java).also { tryException ->
-                tryException?.catchClauses ?: return@also
-                for (catchCause in tryException.catchClauses) {
-                    ignoreCatch.add(findExceptionClassName(catchCause))
-                }
-            }
-
-            // Has @Throws in annotation expression
-            findParentByUast(parentNode, UAnnotationMethod::class.java)?.also { throwsAnnotation ->
-                for (annotation in throwsAnnotation.annotations) {
-                    if (annotation.qualifiedName != "kotlin.jvm.Throws") continue
-                    for (throwsException in findNamedExpressionsInAnnotation(annotation)) {
-                        throwsException ?: continue
-                        if (ignoreCatch.contains(throwsException)) continue
-                        ignoreCatch.add(throwsException)
-                    }
-                }
-            }
-
             uMethod.accept(object : AbstractUastVisitor() {
 
                 // Find throws annotation in method
@@ -114,6 +92,19 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
                     node.accept(object : AbstractUastVisitor() {
 
                         override fun visitClassLiteralExpression(node: UClassLiteralExpression): Boolean {
+
+                            // Has @Throws in annotation expression
+                            val ignoreCatch = HashSet<String>()
+                            findParentByUast(parentNode, UAnnotationMethod::class.java)?.also { throwsAnnotation ->
+                                for (annotation in throwsAnnotation.annotations) {
+                                    if (annotation.qualifiedName != "kotlin.jvm.Throws") continue
+                                    for (throwsException in findNamedExpressionsInAnnotation(annotation)) {
+                                        throwsException ?: continue
+                                        if (ignoreCatch.contains(throwsException)) continue
+                                        ignoreCatch.add(throwsException)
+                                    }
+                                }
+                            }
 
                             val arrayList = ArrayList<String>()
 
@@ -158,6 +149,15 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
                             val clazz = node.resolve()
                             val clazzName = clazz?.containingClass?.qualifiedName
                                 ?: return super.visitCallExpression(node)
+
+                            val ignoreCatch = HashSet<String>()
+                            findParentByUast(parentNode, UTryExpression::class.java).also { tryException ->
+                                tryException?.catchClauses ?: return@also
+                                for (catchCause in tryException.catchClauses) {
+                                    ignoreCatch.add(findExceptionClassName(catchCause))
+                                }
+                            }
+
                             if (ignoreCatch.contains(clazzName)) return super.visitCallExpression(node)
 
                             var superClass = clazz.containingClass?.superClass
