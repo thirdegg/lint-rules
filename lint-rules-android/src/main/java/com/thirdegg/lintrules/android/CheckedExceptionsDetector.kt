@@ -25,17 +25,6 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
 
     override fun getApplicableUastTypes() = listOf<Class<out UElement>>(UCallExpression::class.java)
 
-    fun <T : UElement> findParentByUast(item: UElement, clazz: Class<T>): T? {
-        var parent = item.uastParent
-        while (parent != null) {
-            if (clazz.isInstance(parent)) {
-                return (parent as T)
-            }
-            parent = parent.uastParent
-        }
-        return null
-    }
-
     fun findChildsInPsi(item: PsiElement): ArrayList<PsiElement> {
         val list = ArrayList<PsiElement>()
         for (child in item.children) {
@@ -85,9 +74,9 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
             val method = call.resolve() ?: return
             val uMethod = context.uastContext.getMethod(method)
 
-            // Has @Throws in annotation expression
             val throwsExceptions = HashSet<String>()
 
+            // Find @Throws in annotation expression
             for (annotation in uMethod.annotations) {
                 if (annotation.qualifiedName != "kotlin.jvm.Throws") continue
                 for (throwsException in findNamedExpressionsInAnnotation(annotation)) {
@@ -97,6 +86,7 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
                 }
             }
 
+            // Find throws in method
             for (child in uMethod.uastBody.getQualifiedChain()) {
                 if (child is UBlockExpression) {
                     child.sourcePsi ?: continue
@@ -114,23 +104,24 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
 
 
             val ignoreExceptions = HashSet<String>()
-            findParentByUast(call, UAnnotationMethod::class.java).also { tryException ->
-                if (tryException != null) {
-                    for (child in tryException.annotations) {
-                        for (throwsException in findNamedExpressionsInAnnotation(child)) {
-                            throwsException ?: continue
-                            ignoreExceptions.add(throwsException)
-                        }
+            for (element in call.withContainingElements) {
+                if (element !is UAnnotationMethod) continue
+                for (child in element.annotations) {
+                    for (classInAnnotation in findNamedExpressionsInAnnotation(child)) {
+                        classInAnnotation ?: continue
+                        ignoreExceptions.add(classInAnnotation)
                     }
                 }
+                break
             }
-            findParentByUast(call, UTryExpression::class.java).also { tryException ->
-                if (tryException?.catchClauses != null) {
-                    for (catchCause in tryException.catchClauses) {
-                        val clazzName = findExceptionClassName(catchCause)
-                        ignoreExceptions.add(clazzName);
-                    }
+
+            for (element in call.withContainingElements) {
+                if (element !is UTryExpression) continue
+                for (catchCause in element.catchClauses) {
+                    val clazzName = findExceptionClassName(catchCause)
+                    ignoreExceptions.add(clazzName)
                 }
+                break
             }
 
             for (exceptions in throwsExceptions) {
