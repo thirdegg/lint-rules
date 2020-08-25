@@ -4,9 +4,8 @@ import com.android.tools.lint.client.api.UElementHandler
 import com.android.tools.lint.detector.api.*
 import com.android.tools.lint.detector.api.Category.Companion.CORRECTNESS
 import com.android.tools.lint.detector.api.Severity.WARNING
-import com.intellij.psi.PsiType
+import com.intellij.psi.PsiElement
 import org.jetbrains.uast.*
-import org.jetbrains.uast.visitor.AbstractUastVisitor
 import java.util.*
 import kotlin.collections.ArrayList
 import kotlin.collections.HashSet
@@ -37,6 +36,18 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
         return null
     }
 
+    fun findChildsInPsi(item: PsiElement): ArrayList<PsiElement> {
+        val list = ArrayList<PsiElement>()
+        for (child in item.children) {
+            list.add(child)
+            if (child.children.isNotEmpty()) {
+                list.addAll(findChildsInPsi(child))
+            }
+        }
+        return list
+    }
+
+
     fun findExceptionClassName(catchClause: UCatchClause): String {
         return catchClause.parameters[0].psi.type.canonicalText
     }
@@ -61,127 +72,75 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
         return namedExpressions
     }
 
-    fun findRecursiveExtensionsInClass(superTypes: Array<PsiType>): HashSet<String> {
-        val classes = HashSet<String>()
-        superTypes.forEach {
-            classes.addAll(findRecursiveExtensionsInClass(it.superTypes))
-            classes.add(it.canonicalText)
-        }
-        return classes
-    }
 
     override fun createUastHandler(context: JavaContext) = object : UElementHandler() {
 
         init {
-//            println(context.uastFile?.asRecursiveLogString())
+            println(context.uastFile?.asRecursiveLogString())
         }
 
         override fun visitCallExpression(node: UCallExpression) {
 
-            val parentNode = node
-            val method = parentNode.resolve() ?: return
+            val call = node
+            val method = call.resolve() ?: return
             val uMethod = context.uastContext.getMethod(method)
 
-            uMethod.accept(object : AbstractUastVisitor() {
+            // Has @Throws in annotation expression
+            val throwsExceptions = HashSet<String>()
 
-                // Find throws annotation in method
-                override fun visitAnnotation(node: UAnnotation): Boolean {
-
-                    if (node.qualifiedName != "kotlin.jvm.Throws") return super.visitAnnotation(node)
-
-                    node.accept(object : AbstractUastVisitor() {
-
-                        override fun visitClassLiteralExpression(node: UClassLiteralExpression): Boolean {
-
-                            // Has @Throws in annotation expression
-                            val ignoreCatch = HashSet<String>()
-                            findParentByUast(parentNode, UAnnotationMethod::class.java)?.also { throwsAnnotation ->
-                                for (annotation in throwsAnnotation.annotations) {
-                                    if (annotation.qualifiedName != "kotlin.jvm.Throws") continue
-                                    for (throwsException in findNamedExpressionsInAnnotation(annotation)) {
-                                        throwsException ?: continue
-                                        if (ignoreCatch.contains(throwsException)) continue
-                                        ignoreCatch.add(throwsException)
-                                    }
-                                }
-                            }
-
-                            val arrayList = ArrayList<String>()
-
-                            val clazzName = node.type?.canonicalText
-                                ?: return super.visitClassLiteralExpression(node)
-
-                            arrayList.add(clazzName)
-
-                            if (ignoreCatch.contains(clazzName))
-                                return super.visitClassLiteralExpression(node)
-
-                            if (node.type?.superTypes != null) {
-                                arrayList.addAll(findRecursiveExtensionsInClass(node.type?.superTypes!!))
-                            }
-
-                            for (clazz in arrayList) {
-                                if (ignoreCatch.contains(clazz))
-                                    return super.visitClassLiteralExpression(node)
-                            }
-
-                            context.report(
-                                ISSUE_PATTERN, parentNode, context.getNameLocation(parentNode),
-                                "Unhandled exception: $clazzName"
-                            )
-
-                            return super.visitClassLiteralExpression(node)
-
-                        }
-
-                    })
-
-                    return super.visitAnnotation(node)
+            for (annotation in uMethod.annotations) {
+                if (annotation.qualifiedName != "kotlin.jvm.Throws") continue
+                for (throwsException in findNamedExpressionsInAnnotation(annotation)) {
+                    throwsException ?: continue
+                    if (throwsExceptions.contains(throwsException)) continue
+                    throwsExceptions.add(throwsException)
                 }
+            }
 
-                // Find throw in method
-                override fun visitThrowExpression(node: UThrowExpression): Boolean {
-
-                    node.accept(object : AbstractUastVisitor() {
-
-                        override fun visitCallExpression(node: UCallExpression): Boolean {
-                            //TODO kotlin.Exception() not catch
-                            val clazz = node.resolve()
-                            val clazzName = clazz?.containingClass?.qualifiedName
-                                ?: return super.visitCallExpression(node)
-
-                            val ignoreCatch = HashSet<String>()
-                            findParentByUast(parentNode, UTryExpression::class.java).also { tryException ->
-                                tryException?.catchClauses ?: return@also
-                                for (catchCause in tryException.catchClauses) {
-                                    ignoreCatch.add(findExceptionClassName(catchCause))
-                                }
-                            }
-
-                            if (ignoreCatch.contains(clazzName)) return super.visitCallExpression(node)
-
-                            var superClass = clazz.containingClass?.superClass
-                            while (superClass != null) {
-                                if (ignoreCatch.contains(superClass.qualifiedName)) {
-                                    return super.visitCallExpression(node)
-                                }
-                                superClass = superClass.superClass
-                            }
-                            context.report(
-                                ISSUE_PATTERN,
-                                parentNode,
-                                context.getNameLocation(parentNode),
-                                "Unhandled exception: $clazzName"
-                            )
-                            return super.visitCallExpression(node)
-                        }
-
-                    })
-
-                    return super.visitThrowExpression(node)
+            for (child in uMethod.uastBody.getQualifiedChain()) {
+                if (child is UBlockExpression) {
+                    child.sourcePsi ?: continue
+                    for (psi in findChildsInPsi(child.sourcePsi!!)) {
+                        val uElement = psi.toUElement()
+                        if (uElement == null || uElement !is UThrowExpression) continue
+                        uElement.thrownExpression as UCallExpression
+                        val clazz = (uElement.thrownExpression as UCallExpression).resolve()
+                        val clazzName = clazz?.containingClass?.qualifiedName
+                        clazzName ?: continue
+                        throwsExceptions.add(clazzName)
+                    }
                 }
+            }
 
-            })
+
+            val ignoreExceptions = HashSet<String>()
+            findParentByUast(call, UAnnotationMethod::class.java).also { tryException ->
+                if (tryException != null) {
+                    for (child in tryException.annotations) {
+                        for (throwsException in findNamedExpressionsInAnnotation(child)) {
+                            throwsException ?: continue
+                            ignoreExceptions.add(throwsException)
+                        }
+                    }
+                }
+            }
+            findParentByUast(call, UTryExpression::class.java).also { tryException ->
+                if (tryException?.catchClauses != null) {
+                    for (catchCause in tryException.catchClauses) {
+                        val clazzName = findExceptionClassName(catchCause)
+                        ignoreExceptions.add(clazzName);
+                    }
+                }
+            }
+
+            for (exceptions in throwsExceptions) {
+                if (!ignoreExceptions.contains(exceptions)) {
+                    context.report(
+                        ISSUE_PATTERN, call, context.getNameLocation(call),
+                        "Unhandled exception: $exceptions"
+                    )
+                }
+            }
 
         }
     }
