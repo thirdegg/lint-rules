@@ -48,7 +48,12 @@ class ThrowsInThrowsSecondTestCase {
             .issues(ISSUE_PATTERN)
             .files(ThrowsInThrowsClassKotlin)
             .run()
-            .expect("""""".trimIndent())
+            .expect("""
+                src/com/thirdegg/lintrules/android/CheckLint.kt:24: Warning: Unhandled exception: java.io.IOException [CheckedExceptions]
+                        doesIO()
+                        ~~~~~~
+                0 errors, 1 warnings
+            """.trimIndent())
 
     }
 

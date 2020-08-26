@@ -65,7 +65,7 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
     override fun createUastHandler(context: JavaContext) = object : UElementHandler() {
 
         init {
-            println(context.uastFile?.asRecursiveLogString())
+//            println(context.uastFile?.asRecursiveLogString())
         }
 
         override fun visitCallExpression(node: UCallExpression) {
@@ -105,7 +105,7 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
 
             val ignoreExceptions = HashSet<String>()
             for (element in call.withContainingElements) {
-                if (element !is UAnnotationMethod) continue
+                if (element !is UMethod) continue
                 for (child in element.annotations) {
                     for (classInAnnotation in findNamedExpressionsInAnnotation(child)) {
                         classInAnnotation ?: continue
