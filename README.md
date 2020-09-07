@@ -18,9 +18,13 @@ and to module ```build.gradle```:
 ```gradle
 dependencies {
     ...
-    lintChecks('com.github.thirdegg:lint-rules:0.0.5-alpha')
+    lintChecks('com.github.thirdegg:lint-rules:0.0.6-beta')
 }
 ```
+
+How to update:
+
+Sometimes, after changing the version of a plugin in dependencies, android studio does not give any effect. In order for the changes to work, you need to do `Build > Clear Project` and rebuild the project.
 
 ## Checked Exceptions for kotlin
 How it works:
