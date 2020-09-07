@@ -5,9 +5,11 @@ import com.android.tools.lint.detector.api.*
 import com.android.tools.lint.detector.api.Category.Companion.CORRECTNESS
 import com.android.tools.lint.detector.api.Severity.WARNING
 import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiType
 import org.jetbrains.uast.*
 import java.util.*
 import kotlin.collections.ArrayList
+import kotlin.collections.HashMap
 import kotlin.collections.HashSet
 
 
@@ -36,23 +38,31 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
         return list
     }
 
-
-    fun findExceptionClassName(catchClause: UCatchClause): String {
-        return catchClause.parameters[0].psi.type.canonicalText
+    fun findClassParents(psiClass: PsiType):HashSet<String> {
+        val classes = HashSet<String>()
+        classes.add(psiClass.canonicalText)
+        psiClass.superTypes.forEach {
+            classes.addAll(findClassParents(it))
+        }
+        return classes
     }
 
-    fun findNamedExpressionsInAnnotation(uAnnotation: UAnnotation): HashSet<String?> {
-        val namedExpressions = HashSet<String?>()
+    fun findNamedExpressionsInAnnotation(uAnnotation: UAnnotation): HashSet<PsiType> {
+        val namedExpressions = HashSet<PsiType>()
         for (uNamedExpression in uAnnotation.attributeValues) {
             if (uNamedExpression.expression is UClassLiteralExpression) {
                 // If UClassLiteralExpression.type.canonicalText is null then maybe no import of Exception
-                namedExpressions.add((uNamedExpression.expression as UClassLiteralExpression).type?.canonicalText)
+                (uNamedExpression.expression as UClassLiteralExpression).type?.let {
+                    namedExpressions.add(it)
+                }
                 continue
             }
             if (uNamedExpression.expression is UCallExpression) {
                 for (argument in (uNamedExpression.expression as UCallExpression).valueArguments) {
                     if (argument is UClassLiteralExpression) {
-                        namedExpressions.add(argument.type?.canonicalText)
+                        argument.type?.let {
+                            namedExpressions.add(it)
+                        }
                         continue
                     }
                 }
@@ -60,7 +70,6 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
         }
         return namedExpressions
     }
-
 
     override fun createUastHandler(context: JavaContext) = object : UElementHandler() {
 
@@ -74,16 +83,20 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
             val method = call.resolve() ?: return
             val uMethod = context.uastContext.getMethod(method)
 
-            val throwsExceptions = HashSet<String>()
+            var throwsExceptions = HashMap<String, HashSet<String>>()
 
             // Find @Throws in annotation expression
             for (annotation in uMethod.annotations) {
                 if (annotation.qualifiedName != "kotlin.jvm.Throws") continue
                 for (throwsException in findNamedExpressionsInAnnotation(annotation)) {
-                    throwsException ?: continue
-                    if (throwsExceptions.contains(throwsException)) continue
-                    throwsExceptions.add(throwsException)
+                    throwsExceptions[throwsException.canonicalText] = findClassParents(throwsException)
                 }
+            }
+
+            // Find throws in constructor
+            val throwsList = method.throwsList
+            throwsList.referencedTypes.forEach {
+                throwsExceptions[it.canonicalText] = findClassParents(it)
             }
 
             // Find throws in method
@@ -93,23 +106,26 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
                     for (psi in findChildsInPsi(child.sourcePsi!!)) {
                         val uElement = psi.toUElement()
                         if (uElement == null || uElement !is UThrowExpression) continue
-                        uElement.thrownExpression as UCallExpression
                         val clazz = (uElement.thrownExpression as UCallExpression).resolve()
-                        val clazzName = clazz?.containingClass?.qualifiedName
-                        clazzName ?: continue
-                        throwsExceptions.add(clazzName)
+                        val mainClassName = clazz?.containingClass?.qualifiedName
+                        mainClassName ?: continue
+                        clazz.containingClass?.superTypes?.forEach {
+                            throwsExceptions[mainClassName] = (findClassParents(it).apply { add(mainClassName) })
+                        }
+
                     }
                 }
             }
 
 
-            val ignoreExceptions = HashSet<String>()
+            // Remove catched
             for (element in call.withContainingElements) {
                 if (element !is UMethod) continue
                 for (child in element.annotations) {
                     for (classInAnnotation in findNamedExpressionsInAnnotation(child)) {
-                        classInAnnotation ?: continue
-                        ignoreExceptions.add(classInAnnotation)
+                        throwsExceptions = throwsExceptions.filterTo(HashMap()) {
+                            !it.value.contains(classInAnnotation.canonicalText)
+                        }
                     }
                 }
                 break
@@ -118,19 +134,20 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
             for (element in call.withContainingElements) {
                 if (element !is UTryExpression) continue
                 for (catchCause in element.catchClauses) {
-                    val clazzName = findExceptionClassName(catchCause)
-                    ignoreExceptions.add(clazzName)
+                    catchCause.types.forEach { catch ->
+                        throwsExceptions = throwsExceptions.filterTo(HashMap()) {
+                            !it.value.contains(catch.canonicalText)
+                        }
+                    }
                 }
                 break
             }
 
             for (exceptions in throwsExceptions) {
-                if (!ignoreExceptions.contains(exceptions)) {
-                    context.report(
-                        ISSUE_PATTERN, call, context.getNameLocation(call),
-                        "Unhandled exception: $exceptions"
-                    )
-                }
+                context.report(
+                    ISSUE_PATTERN, call, context.getNameLocation(call),
+                    "Unhandled exception: ${exceptions.key}"
+                )
             }
 
         }
