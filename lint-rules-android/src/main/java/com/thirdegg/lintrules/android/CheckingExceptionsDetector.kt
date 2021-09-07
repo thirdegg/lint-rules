@@ -73,20 +73,15 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
 
     override fun createUastHandler(context: JavaContext) = object : UElementHandler() {
 
-        init {
-//            println(context.uastFile?.asRecursiveLogString())
-        }
-
         override fun visitCallExpression(node: UCallExpression) {
 
-            val call = node
-            val method = call.resolve() ?: return
-            val uMethod = context.uastContext.getMethod(method)
+            val method = node.resolve() ?: return
+            val uMethod = UastFacade.convertElement(method, null, UMethod::class.java) as UMethod
 
             var throwsExceptions = HashMap<String, HashSet<String>>()
 
             // Find @Throws in annotation expression
-            for (annotation in uMethod.annotations) {
+            for (annotation in uMethod.uAnnotations) {
                 if (annotation.qualifiedName != "kotlin.jvm.Throws") continue
                 for (throwsException in findNamedExpressionsInAnnotation(annotation)) {
                     throwsExceptions[throwsException.canonicalText] = findClassParents(throwsException)
@@ -119,9 +114,9 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
 
 
             // Remove catched
-            for (element in call.withContainingElements) {
+            for (element in node.withContainingElements) {
                 if (element !is UMethod) continue
-                for (child in element.annotations) {
+                for (child in element.uAnnotations) {
                     for (classInAnnotation in findNamedExpressionsInAnnotation(child)) {
                         throwsExceptions = throwsExceptions.filterTo(HashMap()) {
                             !it.value.contains(classInAnnotation.canonicalText)
@@ -131,7 +126,7 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
                 break
             }
 
-            for (element in call.withContainingElements) {
+            for (element in node.withContainingElements) {
                 if (element !is UTryExpression) continue
                 for (catchCause in element.catchClauses) {
                     catchCause.types.forEach { catch ->
@@ -145,7 +140,7 @@ class CheckedExceptionsDetector : Detector(), Detector.UastScanner {
 
             for (exceptions in throwsExceptions) {
                 context.report(
-                    ISSUE_PATTERN, call, context.getNameLocation(call),
+                    ISSUE_PATTERN, node, context.getNameLocation(node),
                     "Unhandled exception: ${exceptions.key}"
                 )
             }

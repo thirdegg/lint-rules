@@ -7,4 +7,6 @@ class LintRulesRegistry: IssueRegistry() {
 
     override val issues: List<Issue> = listOf(ISSUE_PATTERN)
 
+    override val api: Int = CURRENT_API
+
 }
