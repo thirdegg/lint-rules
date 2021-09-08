@@ -17,3 +17,11 @@ android {
 dependencies {
     lintPublish project(':checks')
 }
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+        }
+    }
+}
