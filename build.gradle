@@ -1,6 +1,11 @@
 buildscript {
-    ext.kotlin_version = '1.5.30'
+    ext {
+        kotlin_version = '1.5.30'
+        lint_api_version = '30.0.2'
+    }
+
     repositories {
+        mavenCentral()
         google()
         jcenter()
     }
@@ -12,25 +17,9 @@ buildscript {
 
 allprojects {
     repositories {
+        mavenCentral()
         google()
         jcenter()
-    }
-}
-
-subprojects {
-    apply plugin: 'java'
-    apply plugin: 'maven'
-
-    sourceCompatibility = 1.8
-    targetCompatibility = 1.8
-
-    task sourcesJar(type: Jar, dependsOn: classes) {
-        classifier = 'sources'
-        from sourceSets.main.allSource
-    }
-
-    artifacts {
-        archives sourcesJar
     }
 }
 

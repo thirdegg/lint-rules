@@ -1,0 +1,18 @@
+apply plugin: 'java-library'
+apply plugin: 'kotlin'
+apply plugin: 'com.android.lint'
+
+dependencies {
+    // For a description of the below dependencies, see the main project README
+    compileOnly "com.android.tools.lint:lint-api:$lint_api_version"
+    // You typically don't need this one:
+    compileOnly "com.android.tools.lint:lint-checks:$lint_api_version"
+    compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
+
+    testImplementation "junit:junit:4.13.2"
+    testImplementation "com.android.tools.lint:lint:$lint_api_version"
+    testImplementation "com.android.tools.lint:lint-tests:$lint_api_version"
+}
+
+sourceCompatibility = "1.8"
+targetCompatibility = "1.8"
