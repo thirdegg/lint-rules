@@ -21,6 +21,10 @@ dependencies {
 publishing {
     publications {
         mavenJava(MavenPublication) {
+            groupId = 'com.github.thirdegg'
+            artifactId = 'lint-rules'
+            version = '0.1.0'
+
             from components.java
         }
     }
